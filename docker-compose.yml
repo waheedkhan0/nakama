@@ -61,18 +61,31 @@ services:
       retries: 5
       start_period: 60s  # Nakama needs time for migration + startup
 
-  prometheus:
-    image: prom/prometheus:v3.3.1  # Pin version
+prometheus:
+    image: prom/prometheus:v3.0.0
     restart: unless-stopped
     volumes:
-      - './prometheus.yml:/etc/prometheus/prometheus.yml:ro'  # Mount config as a file instead of generating it at runtime
-      - 'prometheus-data:/prometheus'                         # Persist Prometheus data
+      - 'prometheus-data:/prometheus'
     ports:
-      - '127.0.0.1:9090:9090'  # Bind to localhost only — never expose metrics publicly
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=15d'   # Limit storage retention
-      - '--web.enable-lifecycle'               # Allows config reload via HTTP
+      - '127.0.0.1:9090:9090'
+    command: >
+      sh -c "mkdir -p /etc/prometheus &&
+           cp /etc/prometheus/prometheus.yml /etc/prometheus/prometheus.yml.bak 2>/dev/null || true &&
+           echo 'global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [\"localhost:9090\"]
+  - job_name: nakama
+    metrics_path: /
+    static_configs:
+      - targets: [\"nakama:9100\"]' > /etc/prometheus/prometheus.yml &&
+           /bin/prometheus
+        --config.file=/etc/prometheus/prometheus.yml
+        --storage.tsdb.retention.time=15d
+        --web.enable-lifecycle
 
 volumes:
   cockroach-data:
