@@ -1,76 +1,79 @@
 services:
   cockroachdb:
-    image: cockroachdb/cockroach:latest-v24.1
-    command: start-single-node --insecure --store=attrs=ssd,path=/var/lib/cockroach/
-    restart: "no"
+    image: 'cockroachdb/cockroach:v24.1.4'  # Pin to specific patch version, not latest-v24.1
+    command: 'start-single-node --insecure --store=attrs=ssd,path=/var/lib/cockroach/'
+    restart: unless-stopped  # Better than 'no' for production; Coolify will manage restarts
     volumes:
-      - data:/var/lib/cockroach
+      - 'cockroach-data:/var/lib/cockroach'
     expose:
-      - "8080"
-      - "26257"
-    ports:
-      - "26257:26257"
-      - "8080:8080"
+      - '8080'
+      - '26257'
+    # Remove public ports — CockroachDB should NOT be exposed to the host in production.
+    # Nakama reaches it via the internal Docker network.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
-      interval: 3s
-      timeout: 3s
-      retries: 5
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health?ready=1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s  # Give CockroachDB time to initialize before health checks count
+
   nakama:
-    image: registry.heroiclabs.com/heroiclabs/nakama:3.37.0
+    image: 'registry.heroiclabs.com/heroiclabs/nakama:3.37.0'
     entrypoint:
-      - "/bin/sh"
-      - "-ecx"
-      - >
-          /nakama/nakama migrate up --database.address root@cockroachdb:26257 &&
-          exec /nakama/nakama --name nakama1 --database.address root@cockroachdb:26257 --logger.level DEBUG --session.token_expiry_sec 7200 --metrics.prometheus_port 9100
-    restart: "no"
-    links:
-      - "cockroachdb:db"
+      - /bin/sh
+      - '-ecx'
+      - |
+        /nakama/nakama migrate up --database.address root@cockroachdb:26257 &&
+        exec /nakama/nakama \
+          --name nakama1 \
+          --database.address root@cockroachdb:26257 \
+          --logger.level WARN \
+          --session.token_expiry_sec 7200 \
+          --metrics.prometheus_port 9100
+    restart: unless-stopped
     depends_on:
       cockroachdb:
         condition: service_healthy
       prometheus:
         condition: service_started
     volumes:
-      - ./:/nakama/data
+      - './:/nakama/data'
     expose:
-      - "7349"
-      - "7350"
-      - "7351"
-      - "9100"
+      - '7349'
+      - '7350'
+      - '7351'
+      - '9100'
     ports:
-      - "7349:7349"
-      - "7350:7350"
-      - "7351:7351"
+      # 7349 = client real-time (WebSocket/TCP) — expose if needed externally
+      - '7349:7349'
+      # 7350 = HTTP API — this is what your reverse proxy (Coolify/Traefik) should front
+      - '7350:7350'
+      # 7351 = gRPC — expose only if your game client uses gRPC directly
+      - '7351:7351'
+    environment:
+      # Use env vars for secrets instead of hardcoding them in the entrypoint
+      - NAKAMA_RUNTIME_HTTP_KEY=${NAKAMA_HTTP_KEY}
+      - NAKAMA_CONSOLE_PASSWORD=${NAKAMA_CONSOLE_PASSWORD}
     healthcheck:
-      test: ["CMD", "/nakama/nakama", "healthcheck"]
-      interval: 10s
+      test: [CMD, /nakama/nakama, healthcheck]
+      interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 60s  # Nakama needs time for migration + startup
+
   prometheus:
-    image: prom/prometheus
-    entrypoint: /bin/sh -c
-    command: |
-      'sh -s <<EOF
-        cat > ./prometheus.yml <<EON
-      global:
-        scrape_interval:     15s
-        evaluation_interval: 15s
-
-      scrape_configs:
-        - job_name: prometheus
-          static_configs:
-          - targets: ['localhost:9090']
-
-        - job_name: nakama
-          metrics_path: /
-          static_configs:
-          - targets: ['nakama:9100']
-      EON
-      prometheus --config.file=./prometheus.yml
-      EOF'
+    image: prom/prometheus:v3.3.1  # Pin version
+    restart: unless-stopped
+    volumes:
+      - './prometheus.yml:/etc/prometheus/prometheus.yml:ro'  # Mount config as a file instead of generating it at runtime
+      - 'prometheus-data:/prometheus'                         # Persist Prometheus data
     ports:
-      - '9090:9090'
+      - '127.0.0.1:9090:9090'  # Bind to localhost only — never expose metrics publicly
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'   # Limit storage retention
+      - '--web.enable-lifecycle'               # Allows config reload via HTTP
+
 volumes:
-  data:
+  cockroach-data:
+  prometheus-data:
