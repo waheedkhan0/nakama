@@ -1,3 +1,5 @@
+name: nakama-server
+
 services:
   cockroachdb:
     image: 'cockroachdb/cockroach:24.1.4'
@@ -46,7 +48,7 @@ services:
       - "7350:7350"
       - "7351:7351"
     environment:
-      - NAKAMA_UNTIME_HTTP_KEY=${NAKAMA_HTTP_KEY}
+      - NAKAMA_RUNTIME_HTTP_KEY=${NAKAMA_HTTP_KEY}
       - NAKAMA_CONSOLE_PASSWORD=${NAKAMA_CONSOLE_PASSWORD}
     healthcheck:
       test: ["CMD", "/nakama/nakama", "healthcheck"]
@@ -56,19 +58,17 @@ services:
       start_period: 60s
 
   prometheus:
-    image: prom/rometheus:v3.0.0
+    image: prom/prometheus:v3.0.0
     restart: unless-stopped
     volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
       - "127.0.0.1:9090:9090"
     command:
-      - sh
-      - -c
-      - |
-        mkdir -p /etc/prometheus /prometheus/data
-        printf 'global:\n  scrape_interval: 15s\n  evaluation_interval: 15s\nscrape_configs:\n  - job_name: prometheus\n    static_configs:\n      - targets: [localhost:9090]\n  - job_name: nakama\n    metrics_path: /\n    static_configs:\n      - targets: [nakama:9100]\n' > /etc/prometheus/prometheus.yml
-        /bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=15d --web.enable-lifecycle
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
       interval: 30s
