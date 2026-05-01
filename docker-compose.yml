@@ -2,7 +2,7 @@ name: nakama-server
 
 services:
   cockroachdb:
-    image: 'cockroachdb/cockroach:24.1.4'
+    image: 'cockroachdb/cockroach:v24.1.25'
     command: start-single-node --insecure --store=attrs=ssd,path=/var/lib/cockroach/
     restart: unless-stopped
     volumes:
