@@ -29,7 +29,14 @@ services:
           --database.address root@cockroachdb:26257 \
           --logger.level WARN \
           --session.token_expiry_sec 7200 \
-          --metrics.prometheus_port 9100
+          --metrics.prometheus_port 9100 \
+          --runtime.http_key "${NAKAMA_HTTP_KEY}" \
+          --console.username "${NAKAMA_CONSOLE_USERNAME}" \
+          --console.password "${NAKAMA_CONSOLE_PASSWORD}" \
+          --console.signing_key "${NAKAMA_CONSOLE_SIGNING_KEY}" \
+          --socket.server_key "${NAKAMA_SOCKET_SERVER_KEY}" \
+          --session.encryption_key "${NAKAMA_SESSION_ENCRYPTION_KEY}" \
+          --session.refresh_encryption_key "${NAKAMA_SESSION_REFRESH_ENCRYPTION_KEY}"
     restart: unless-stopped
     depends_on:
       cockroachdb:
@@ -48,8 +55,13 @@ services:
       - "7350:7350"
       - "7351:7351"
     environment:
-      - NAKAMA_RUNTIME_HTTP_KEY=${NAKAMA_HTTP_KEY}
+      - NAKAMA_HTTP_KEY=${NAKAMA_HTTP_KEY}
+      - NAKAMA_CONSOLE_USERNAME=${NAKAMA_CONSOLE_USERNAME}
       - NAKAMA_CONSOLE_PASSWORD=${NAKAMA_CONSOLE_PASSWORD}
+      - NAKAMA_CONSOLE_SIGNING_KEY=${NAKAMA_CONSOLE_SIGNING_KEY}
+      - NAKAMA_SOCKET_SERVER_KEY=${NAKAMA_SOCKET_SERVER_KEY}
+      - NAKAMA_SESSION_ENCRYPTION_KEY=${NAKAMA_SESSION_ENCRYPTION_KEY}
+      - NAKAMA_SESSION_REFRESH_ENCRYPTION_KEY=${NAKAMA_SESSION_REFRESH_ENCRYPTION_KEY}
     healthcheck:
       test: ["CMD", "/nakama/nakama", "healthcheck"]
       interval: 15s
