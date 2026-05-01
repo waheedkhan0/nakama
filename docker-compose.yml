@@ -1,27 +1,25 @@
 services:
   cockroachdb:
-    image: 'cockroachdb/cockroach:v24.1.4'  # Pin to specific patch version, not latest-v24.1
-    command: 'start-single-node --insecure --store=attrs=ssd,path=/var/lib/cockroach/'
-    restart: unless-stopped  # Better than 'no' for production; Coolify will manage restarts
+    image: 'cockroachdb/cockroach:24.1.4'
+    command: start-single-node --insecure --store=attrs=ssd,path=/var/lib/cockroach/
+    restart: unless-stopped
     volumes:
-      - 'cockroach-data:/var/lib/cockroach'
+      - cockroach-data:/var/lib/cockroach
     expose:
-      - '8080'
-      - '26257'
-    # Remove public ports — CockroachDB should NOT be exposed to the host in production.
-    # Nakama reaches it via the internal Docker network.
+      - "8080"
+      - "26257"
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health?ready=1']
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s  # Give CockroachDB time to initialize before health checks count
+      start_period: 30s
 
   nakama:
-    image: 'registry.heroiclabs.com/heroiclabs/nakama:3.37.0'
+    image: registry.heroiclabs.com/heroiclabs/nakama:3.37.0
     entrypoint:
       - /bin/sh
-      - '-ecx'
+      - -ecx
       - |
         /nakama/nakama migrate up --database.address root@cockroachdb:26257 &&
         exec /nakama/nakama \
@@ -37,55 +35,45 @@ services:
       prometheus:
         condition: service_started
     volumes:
-      - './:/nakama/data'
+      - ./:/nakama/data
     expose:
-      - '7349'
-      - '7350'
-      - '7351'
-      - '9100'
+      - "7349"
+      - "7350"
+      - "7351"
+      - "9100"
     ports:
-      # 7349 = client real-time (WebSocket/TCP) — expose if needed externally
-      - '7349:7349'
-      # 7350 = HTTP API — this is what your reverse proxy (Coolify/Traefik) should front
-      - '7350:7350'
-      # 7351 = gRPC — expose only if your game client uses gRPC directly
-      - '7351:7351'
+      - "7349:7349"
+      - "7350:7350"
+      - "7351:7351"
     environment:
-      # Use env vars for secrets instead of hardcoding them in the entrypoint
-      - NAKAMA_RUNTIME_HTTP_KEY=${NAKAMA_HTTP_KEY}
+      - NAKAMA_UNTIME_HTTP_KEY=${NAKAMA_HTTP_KEY}
       - NAKAMA_CONSOLE_PASSWORD=${NAKAMA_CONSOLE_PASSWORD}
     healthcheck:
-      test: [CMD, /nakama/nakama, healthcheck]
+      test: ["CMD", "/nakama/nakama", "healthcheck"]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 60s  # Nakama needs time for migration + startup
+      start_period: 60s
 
-prometheus:
-    image: prom/prometheus:v3.0.0
+  prometheus:
+    image: prom/rometheus:v3.0.0
     restart: unless-stopped
     volumes:
-      - 'prometheus-data:/prometheus'
+      - prometheus-data:/prometheus
     ports:
-      - '127.0.0.1:9090:9090'
-    command: >
-      sh -c "mkdir -p /etc/prometheus &&
-           cp /etc/prometheus/prometheus.yml /etc/prometheus/prometheus.yml.bak 2>/dev/null || true &&
-           echo 'global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-scrape_configs:
-  - job_name: prometheus
-    static_configs:
-      - targets: [\"localhost:9090\"]
-  - job_name: nakama
-    metrics_path: /
-    static_configs:
-      - targets: [\"nakama:9100\"]' > /etc/prometheus/prometheus.yml &&
-           /bin/prometheus
-        --config.file=/etc/prometheus/prometheus.yml
-        --storage.tsdb.retention.time=15d
-        --web.enable-lifecycle
+      - "127.0.0.1:9090:9090"
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /etc/prometheus /prometheus/data
+        printf 'global:\n  scrape_interval: 15s\n  evaluation_interval: 15s\nscrape_configs:\n  - job_name: prometheus\n    static_configs:\n      - targets: [localhost:9090]\n  - job_name: nakama\n    metrics_path: /\n    static_configs:\n      - targets: [nakama:9100]\n' > /etc/prometheus/prometheus.yml
+        /bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=15d --web.enable-lifecycle
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   cockroach-data:
