@@ -2,7 +2,7 @@ name: nakama-server
 
 services:
   cockroachdb:
-    image: 'cockroachdb/cockroach:v24.1.25'
+    image: 'cockroachdb/cockroach:v24.1.4'
     command: start-single-node --insecure --store=attrs=ssd,path=/var/lib/cockroach/
     restart: unless-stopped
     volumes:
@@ -60,15 +60,31 @@ services:
   prometheus:
     image: prom/prometheus:v3.0.0
     restart: unless-stopped
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/prometheus/prometheus.yml <<EOF
+        global:
+          scrape_interval: 15s
+          evaluation_interval: 15s
+        scrape_configs:
+          - job_name: prometheus
+            static_configs:
+              - targets: ['localhost:9090']
+          - job_name: nakama
+            metrics_path: /
+            static_configs:
+              - targets: ['nakama:9100']
+        EOF
+        /bin/prometheus \
+          --config.file=/etc/prometheus/prometheus.yml \
+          --storage.tsdb.retention.time=15d \
+          --web.enable-lifecycle
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
       - "127.0.0.1:9090:9090"
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=15d'
-      - '--web.enable-lifecycle'
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
       interval: 30s
