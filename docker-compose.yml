@@ -26,11 +26,17 @@ services:
         /nakama/nakama migrate up --database.address root@cockroachdb:26257 &&
         exec /nakama/nakama \
           --name nakama1 \
-          --config /nakama/data/nakama-config.yml \
+          --data_dir /nakama/data \
           --database.address root@cockroachdb:26257 \
           --logger.level WARN \
           --metrics.prometheus_port 9100 \
+          --matchmaker.interval_sec 1 \
+          --matchmaker.max_tickets 100 \
+          --socket.max_message_size_bytes 4096 \
+          --socket.max_request_size_bytes 4096 \
+          --socket.idle_timeout_min 5 \
           --runtime.http_key "${NAKAMA_HTTP_KEY}" \
+          --runtime.js_entrypoint "modules/main.js" \
           --console.username "${NAKAMA_CONSOLE_USERNAME}" \
           --console.password "${NAKAMA_CONSOLE_PASSWORD}" \
           --console.signing_key "${NAKAMA_CONSOLE_SIGNING_KEY}" \
