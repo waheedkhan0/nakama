@@ -26,9 +26,9 @@ services:
         /nakama/nakama migrate up --database.address root@cockroachdb:26257 &&
         exec /nakama/nakama \
           --name nakama1 \
+          --config /nakama/data/nakama-config.yml \
           --database.address root@cockroachdb:26257 \
           --logger.level WARN \
-          --session.token_expiry_sec 7200 \
           --metrics.prometheus_port 9100 \
           --runtime.http_key "${NAKAMA_HTTP_KEY}" \
           --console.username "${NAKAMA_CONSOLE_USERNAME}" \
