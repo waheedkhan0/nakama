@@ -27,39 +27,9 @@ services:
         cat > /nakama/data/modules/main.js <<'JSEOF'
         var InitModule = function (ctx, logger, nk, initializer) {
           logger.info('Punch-Line Politics server module loaded');
-          initializer.registerMatch('punchline_match', {
-            matchInit: matchInit,
-            matchJoinAttempt: matchJoinAttempt,
-            matchJoin: matchJoin,
-            matchLeave: matchLeave,
-            matchLoop: matchLoop,
-            matchTerminate: matchTerminate,
-          });
           initializer.registerRpc('get_leaderboard', getLeaderboard);
           initializer.registerRpc('report_match_result', reportMatchResult);
           initializer.registerRpc('update_player_mmr', updatePlayerMmr);
-        };
-        var matchInit = function (ctx, logger, nk, params) {
-          var state = { players: {}, round: 0, startTime: Date.now(), preset: (params && params.mode) ? params.mode : 'casual' };
-          return { state: state, tickRate: 30, label: 'Punch-Line Match' };
-        };
-        var matchJoinAttempt = function (ctx, logger, nk, dispatcher, tick, state, presence, metadata) {
-          return { state: state, accept: true };
-        };
-        var matchJoin = function (ctx, logger, nk, dispatcher, tick, state, presences) {
-          for (var i = 0; i < presences.length; i++) { state.players[presences[i].userId] = presences[i]; }
-          return { state: state };
-        };
-        var matchLeave = function (ctx, logger, nk, dispatcher, tick, state, presences) {
-          for (var i = 0; i < presences.length; i++) { delete state.players[presences[i].userId]; }
-          return { state: state };
-        };
-        var matchLoop = function (ctx, logger, nk, dispatcher, tick, state, messages) {
-          for (var i = 0; i < messages.length; i++) { dispatcher.broadcastMessage(messages[i].opCode, messages[i].data, null, false); }
-          return { state: state };
-        };
-        var matchTerminate = function (ctx, logger, nk, dispatcher, tick, state, graceSeconds) {
-          return { state: state };
         };
         var getLeaderboard = function (ctx, logger, nk, payload) {
           try { return JSON.stringify(nk.leaderboardRecordsList('mmr_global', null, 100, null, null)); }
