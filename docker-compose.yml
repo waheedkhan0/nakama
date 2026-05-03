@@ -24,34 +24,6 @@ services:
       - -ecx
       - |
         mkdir -p /nakama/data/modules
-        cat > /nakama/data/modules/main.js <<'JSEOF'
-        var InitModule = function (ctx, logger, nk, initializer) {
-          logger.info('Punch-Line Politics server module loaded');
-          initializer.registerRpc('get_leaderboard', getLeaderboard);
-          initializer.registerRpc('report_match_result', reportMatchResult);
-          initializer.registerRpc('update_player_mmr', updatePlayerMmr);
-        };
-        var getLeaderboard = function (ctx, logger, nk, payload) {
-          try { return JSON.stringify(nk.leaderboardRecordsList('mmr_global', null, 100, null, null)); }
-          catch (err) { return JSON.stringify({ error: err.message }); }
-        };
-        var reportMatchResult = function (ctx, logger, nk, payload) {
-          try {
-            var data = JSON.parse(payload);
-            nk.leaderboardRecordWrite('mmr_global', data.winnerId, '', data.winnerMmr || 0, 0);
-            nk.leaderboardRecordWrite('mmr_global', data.loserId, '', data.loserMmr || 0, 0);
-            nk.storageWrite([
-              { collection: 'player_data', key: 'stats', userId: data.winnerId, value: { coins: data.winnerCoins ? String(data.winnerCoins) : '0', mmr: String(data.winnerMmr || 0) }, permissionRead: 2, permissionWrite: 1 },
-              { collection: 'player_data', key: 'stats', userId: data.loserId, value: { coins: data.loserCoins ? String(data.loserCoins) : '0', mmr: String(data.loserMmr || 0) }, permissionRead: 2, permissionWrite: 1 },
-            ]);
-            return JSON.stringify({ success: true });
-          } catch (err) { return JSON.stringify({ error: err.message }); }
-        };
-        var updatePlayerMmr = function (ctx, logger, nk, payload) {
-          try { var data = JSON.parse(payload); nk.leaderboardRecordWrite('mmr_global', data.userId, '', data.mmr || 0, 0); return JSON.stringify({ success: true, mmr: data.mmr }); }
-          catch (err) { return JSON.stringify({ error: err.message }); }
-        };
-        JSEOF
         cat > /nakama/data/nakama-config.yml <<'CONFIGEOF'
         name: punchline-politics-server
         data_dir: /nakama/data
