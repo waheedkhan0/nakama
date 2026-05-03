@@ -4,6 +4,14 @@
 var InitModule = function (ctx, logger, nk, initializer) {
   logger.info('Punch-Line Politics server module loaded');
 
+  // Ensure the global MMR leaderboard exists
+  try {
+    nk.leaderboardCreate('mmr_global', 1, 0, '', {});
+    logger.info('Created leaderboard: mmr_global');
+  } catch (e) {
+    logger.info('Leaderboard mmr_global already exists (or error): %s', e.message);
+  }
+
   logger.info('Registering match: punchline_match');
   initializer.registerMatch('punchline_match', {
     matchInit: matchInit,
@@ -205,13 +213,12 @@ var matchSignal = function (ctx, logger, nk, dispatcher, tick, state, data) {
 /* ------------------------------------------------------------------ */
 
 var matchmakerMatched = function (ctx, logger, nk, matches) {
-  var match = matches[0];
-  var players = match.presence || [];
+  var players = matches.map(function(m) { return m.presence; });
 
   logger.info('Match found: %s',
     players.map(function (p) { return p.username; }).join(' vs '));
 
-  var mode = (match.stringProperties && match.stringProperties.mode) || 'casual';
+  var mode = (matches[0].stringProperties && matches[0].stringProperties.mode) || 'casual';
 
   var matchId = nk.matchCreate('punchline_match', { mode: mode });
 
@@ -227,7 +234,20 @@ var matchmakerMatched = function (ctx, logger, nk, matches) {
 var getLeaderboard = function (ctx, logger, nk, payload) {
   try {
     var result = nk.leaderboardRecordsList('mmr_global', null, 100, null, null);
-    return JSON.stringify(result);
+    var records = [];
+    if (result && result.ownerRecords) {
+      for (var i = 0; i < result.ownerRecords.length; i++) {
+        var r = result.ownerRecords[i];
+        records.push({
+          username: r.username || '',
+          mmr: r.score || r.value || 0,
+          wins: (r.metadata && r.metadata.wins) ? parseInt(r.metadata.wins) : 0,
+          rank: r.rank || 0,
+          userId: r.ownerId || '',
+        });
+      }
+    }
+    return JSON.stringify({ records: records });
   } catch (err) {
     logger.error('getLeaderboard error: %s', err.message);
     return JSON.stringify({ error: err.message });
