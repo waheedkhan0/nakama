@@ -36,13 +36,13 @@ services:
           interval_sec: 1
           max_tickets: 100
         socket:
-          server_key: defaultkey
+          server_key: 69efdfd89977da508991899985a8a01fee457ab8bedaae6b983c282ea9b2e2ce
           max_message_size_bytes: 4096
           max_request_size_bytes: 262144
           idle_timeout_ms: 300000
         runtime:
           js_entrypoint: main.js
-          http_key: defaultkey
+          http_key: 69efdfd89977da508991899985a8a01fee457ab8bedaae6b983c282ea9b2e2ce
         console:
           port: 7351
         CONFIGEOF
@@ -57,7 +57,7 @@ services:
           --console.username "${NAKAMA_CONSOLE_USERNAME}" \
           --console.password "${NAKAMA_CONSOLE_PASSWORD}" \
           --console.signing_key "${NAKAMA_CONSOLE_SIGNING_KEY}" \
-          --socket.server_key "${NAKAMA_SOCKET_SERVER_KEY}" \
+          --socket.server_key "${NAKAMA_SOCKET_SERVER_KEY:-69efdfd89977da508991899985a8a01fee457ab8bedaae6b983c282ea9b2e2ce}" \
           --session.encryption_key "${NAKAMA_SESSION_ENCRYPTION_KEY}" \
           --session.refresh_encryption_key "${NAKAMA_SESSION_REFRESH_ENCRYPTION_KEY}"
     restart: unless-stopped
@@ -78,13 +78,13 @@ services:
       - "7350:7350"
       - "7351:7351"
     environment:
-      - NAKAMA_HTTP_KEY=${NAKAMA_HTTP_KEY}
-      - NAKAMA_CONSOLE_USERNAME=${NAKAMA_CONSOLE_USERNAME}
-      - NAKAMA_CONSOLE_PASSWORD=${NAKAMA_CONSOLE_PASSWORD}
-      - NAKAMA_CONSOLE_SIGNING_KEY=${NAKAMA_CONSOLE_SIGNING_KEY}
-      - NAKAMA_SOCKET_SERVER_KEY=${NAKAMA_SOCKET_SERVER_KEY}
-      - NAKAMA_SESSION_ENCRYPTION_KEY=${NAKAMA_SESSION_ENCRYPTION_KEY}
-      - NAKAMA_SESSION_REFRESH_ENCRYPTION_KEY=${NAKAMA_SESSION_REFRESH_ENCRYPTION_KEY}
+      - NAKAMA_HTTP_KEY=${NAKAMA_HTTP_KEY:-69efdfd89977da508991899985a8a01fee457ab8bedaae6b983c282ea9b2e2ce}
+      - NAKAMA_CONSOLE_USERNAME=${NAKAMA_CONSOLE_USERNAME:-admin}
+      - NAKAMA_CONSOLE_PASSWORD=${NAKAMA_CONSOLE_PASSWORD:-password}
+      - NAKAMA_CONSOLE_SIGNING_KEY=${NAKAMA_CONSOLE_SIGNING_KEY:-changeme}
+      - NAKAMA_SOCKET_SERVER_KEY=${NAKAMA_SOCKET_SERVER_KEY:-69efdfd89977da508991899985a8a01fee457ab8bedaae6b983c282ea9b2e2ce}
+      - NAKAMA_SESSION_ENCRYPTION_KEY=${NAKAMA_SESSION_ENCRYPTION_KEY:-defaultencryptionkey}
+      - NAKAMA_SESSION_REFRESH_ENCRYPTION_KEY=${NAKAMA_SESSION_REFRESH_ENCRYPTION_KEY:-defaultrefreshkey}
     healthcheck:
       test: ["CMD", "/nakama/nakama", "healthcheck"]
       interval: 15s

@@ -109,25 +109,25 @@ var matchLoop = function (ctx, logger, nk, dispatcher, tick, state, messages) {
 
     switch (msg.opCode) {
       case 1:
-        // Fight action — relay to all OTHER players (exclude sender)
+        // Fight action — relay to all OTHER players
         dispatcher.broadcastMessage(msg.opCode, msg.data, null, msg.sender);
         break;
 
       case 2:
-        // Character select — store characterId and broadcast to ALL
+        // Character select — store fighterId and relay to others
         if (state.players[msg.sender.userId]) {
           try {
             var charData = JSON.parse(msg.data);
-            state.players[msg.sender.userId].characterId = charData.characterId || '';
+            state.players[msg.sender.userId].characterId = charData.fighterId || '';
           } catch (e) {
             logger.warn('Invalid character select data from %s', msg.sender.userId);
           }
         }
-        dispatcher.broadcastMessage(msg.opCode, msg.data, null, null);
+        dispatcher.broadcastMessage(msg.opCode, msg.data, null, msg.sender);
         break;
 
       case 3:
-        // Match end — record winner, deactivate round, broadcast to ALL
+        // Match end — record winner, deactivate round, relay to others
         try {
           var endData = JSON.parse(msg.data);
           state.winnerId = endData.winnerId || null;
@@ -135,42 +135,17 @@ var matchLoop = function (ctx, logger, nk, dispatcher, tick, state, messages) {
           logger.warn('Invalid match end data from %s', msg.sender.userId);
         }
         state.roundActive = false;
-        dispatcher.broadcastMessage(msg.opCode, msg.data, null, null);
+        dispatcher.broadcastMessage(msg.opCode, msg.data, null, msg.sender);
         break;
 
       case 4:
-        // Ready state — track readiness, increment round when both ready
-        try {
-          var readyData = JSON.parse(msg.data);
-          if (readyData.ready && state.players[msg.sender.userId]) {
-            state.players[msg.sender.userId].ready = true;
-
-            var allReady = true;
-            for (var id in state.players) {
-              if (!state.players[id].ready) {
-                allReady = false;
-                break;
-              }
-            }
-
-            if (allReady) {
-              state.round++;
-              state.roundActive = true;
-              for (var pid in state.players) {
-                state.players[pid].ready = false;
-              }
-              logger.info('Both players ready, starting round %d', state.round);
-            }
-          }
-        } catch (e) {
-          logger.warn('Invalid ready state data from %s', msg.sender.userId);
-        }
-        dispatcher.broadcastMessage(msg.opCode, msg.data, null, null);
+        // Enhancement loadout — relay to all OTHER players
+        dispatcher.broadcastMessage(msg.opCode, msg.data, null, msg.sender);
         break;
 
       default:
         logger.warn('Unknown opCode %d from %s', msg.opCode, msg.sender.userId);
-        dispatcher.broadcastMessage(msg.opCode, msg.data, null, null);
+        dispatcher.broadcastMessage(msg.opCode, msg.data, null, msg.sender);
         break;
     }
   }
@@ -213,16 +188,18 @@ var matchSignal = function (ctx, logger, nk, dispatcher, tick, state, data) {
 /* ------------------------------------------------------------------ */
 
 var matchmakerMatched = function (ctx, logger, nk, matches) {
-  var players = matches.map(function(m) { return m.presence; });
+  var usernames = matches.map(function(m) { return m.presence.username; });
 
   logger.info('Match found: %s',
-    players.map(function (p) { return p.username; }).join(' vs '));
+    usernames.join(' vs '));
 
-  var mode = (matches[0].stringProperties && matches[0].stringProperties.mode) || 'casual';
+  var props = matches[0].stringProperties || {};
+  var mode = props.mode || 'casual';
+  var fighterId = props.fighterId || '';
 
-  var matchId = nk.matchCreate('punchline_match', { mode: mode });
+  var matchId = nk.matchCreate('punchline_match', { mode: mode, fighterId: fighterId });
 
-  logger.info('Created match %s for mode %s', matchId, mode);
+  logger.info('Created match %s mode=%s fighter=%s', matchId, mode, fighterId);
 
   return matchId;
 };
@@ -286,6 +263,28 @@ var reportMatchResult = function (ctx, logger, nk, payload) {
           coins: data.loserCoins ? String(data.loserCoins) : '0',
           mmr: String(loserMmr),
           character_wins: data.loserCharacterWins ? JSON.stringify(data.loserCharacterWins) : '{}',
+        },
+        permissionRead: 0,
+        permissionWrite: 1,
+      },
+      {
+        collection: 'player_profile',
+        key: winnerId,
+        userId: winnerId,
+        value: {
+          displayName: data.winnerDisplayName || '',
+          fighterWins: data.winnerCharacterWins ? JSON.stringify(data.winnerCharacterWins) : '{}',
+        },
+        permissionRead: 0,
+        permissionWrite: 1,
+      },
+      {
+        collection: 'player_profile',
+        key: loserId,
+        userId: loserId,
+        value: {
+          displayName: data.loserDisplayName || '',
+          fighterWins: data.loserCharacterWins ? JSON.stringify(data.loserCharacterWins) : '{}',
         },
         permissionRead: 0,
         permissionWrite: 1,
