@@ -193,7 +193,7 @@ var matchmakerMatched = function (ctx, logger, nk, matches) {
   logger.info('Match found: %s',
     usernames.join(' vs '));
 
-  var props = matches[0].stringProperties || {};
+  var props = matches[0].properties || {};
   var mode = props.mode || 'casual';
   var fighterId = props.fighterId || '';
 
@@ -210,19 +210,20 @@ var matchmakerMatched = function (ctx, logger, nk, matches) {
 
 var getLeaderboard = function (ctx, logger, nk, payload) {
   try {
-    var result = nk.leaderboardRecordsList('mmr_global', null, 100, null, null);
+    var data = payload ? JSON.parse(payload) : {};
+    var limit = data.limit || 100;
+    var result = nk.leaderboardRecordsList('mmr_global', null, limit, null, null);
     var records = [];
-    if (result && result.ownerRecords) {
-      for (var i = 0; i < result.ownerRecords.length; i++) {
-        var r = result.ownerRecords[i];
-        records.push({
-          username: r.username || '',
-          mmr: r.score || r.value || 0,
-          wins: (r.metadata && r.metadata.wins) ? parseInt(r.metadata.wins) : 0,
-          rank: r.rank || 0,
-          userId: r.ownerId || '',
-        });
-      }
+    var allRecords = result ? (result.records || result.ownerRecords || []) : [];
+    for (var i = 0; i < allRecords.length; i++) {
+      var r = allRecords[i];
+      records.push({
+        username: r.username || '',
+        mmr: r.score || r.value || 0,
+        wins: (r.metadata && r.metadata.wins) ? parseInt(r.metadata.wins) : 0,
+        rank: r.maxNumScore || 0,
+        userId: r.ownerId || '',
+      });
     }
     return JSON.stringify({ records: records });
   } catch (err) {
@@ -241,6 +242,25 @@ var reportMatchResult = function (ctx, logger, nk, payload) {
 
     nk.leaderboardRecordWrite('mmr_global', winnerId, '', winnerMmr, 0);
     nk.leaderboardRecordWrite('mmr_global', loserId,  '', loserMmr,  0);
+
+    var winnerDisplayName = data.winnerDisplayName;
+    var loserDisplayName = data.loserDisplayName;
+    if (!winnerDisplayName || !loserDisplayName) {
+      var result = nk.accountsGetId([winnerId, loserId]);
+      if (result) {
+        for (var i = 0; i < result.length; i++) {
+          var acct = result[i];
+          if (acct && acct.user) {
+            if (acct.user.userId === winnerId && !winnerDisplayName) {
+              winnerDisplayName = acct.user.displayName || acct.user.username || '';
+            }
+            if (acct.user.userId === loserId && !loserDisplayName) {
+              loserDisplayName = acct.user.displayName || acct.user.username || '';
+            }
+          }
+        }
+      }
+    }
 
     nk.storageWrite([
       {
@@ -272,7 +292,7 @@ var reportMatchResult = function (ctx, logger, nk, payload) {
         key: winnerId,
         userId: winnerId,
         value: {
-          displayName: data.winnerDisplayName || '',
+          displayName: winnerDisplayName || '',
           fighterWins: data.winnerCharacterWins ? JSON.stringify(data.winnerCharacterWins) : '{}',
         },
         permissionRead: 0,
@@ -283,7 +303,7 @@ var reportMatchResult = function (ctx, logger, nk, payload) {
         key: loserId,
         userId: loserId,
         value: {
-          displayName: data.loserDisplayName || '',
+          displayName: loserDisplayName || '',
           fighterWins: data.loserCharacterWins ? JSON.stringify(data.loserCharacterWins) : '{}',
         },
         permissionRead: 0,
