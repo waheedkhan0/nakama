@@ -51,7 +51,7 @@ services:
           --name nakama1 \
           --config /nakama/data/nakama-config.yml \
           --database.address root@cockroachdb:26257 \
-          --logger.level WARN \
+          --logger.level INFO \
           --metrics.prometheus_port 9100 \
           --runtime.http_key "${NAKAMA_HTTP_KEY}" \
           --console.username "${NAKAMA_CONSOLE_USERNAME}" \
