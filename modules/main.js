@@ -6,7 +6,7 @@ var InitModule = function (ctx, logger, nk, initializer) {
 
   // Ensure the global MMR leaderboard exists
   try {
-    nk.leaderboardCreate('mmr_global', 1, 0, '', {});
+    nk.leaderboardCreate('mmr_global', true, 'desc', 'best', '', {}, false);
     logger.info('Created leaderboard: mmr_global');
   } catch (e) {
     logger.info('Leaderboard mmr_global already exists (or error): %s', e.message);
